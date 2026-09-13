@@ -36,7 +36,7 @@ const STATUS_MESSAGES: Record<AppState, string> = {
   ready: "Ready to connect",
   connecting_meta: "Connecting to Meta...",
   completing: "Completing WhatsApp setup...",
-  success: "WhatsApp connected successfully",
+  success: "WhatsApp connected successfully", 
   error: "Something went wrong.",
 };
 
