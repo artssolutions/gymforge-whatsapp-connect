@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { completeEmbeddedSignup, verifyConnectSession } from "./api/gymforgeApi";
+import {
+  ConnectSessionVerifyError,
+  completeEmbeddedSignup,
+  verifyConnectSession,
+  type ConnectSessionVerifyDiagnostics,
+} from "./api/gymforgeApi";
 import type { SignupCredentials } from "./types/connectSession";
 import type {
   FacebookSdk,
@@ -105,6 +110,8 @@ function App() {
   const [sessionVerified, setSessionVerified] = useState(false);
   const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [verifyDiagnostics, setVerifyDiagnostics] =
+    useState<ConnectSessionVerifyDiagnostics | null>(null);
 
   const connectTokenRef = useRef<string | null>(null);
   const authCodeRef = useRef<string | null>(null);
@@ -177,19 +184,32 @@ function App() {
       setSessionVerified(false);
       setConnectedPhone(null);
       setErrorMessage("");
+      setVerifyDiagnostics(null);
       setAppState("verifying");
 
       try {
         await verifyConnectSession(trimmed);
         setSessionVerified(true);
+        setVerifyDiagnostics(null);
         setAppState("ready");
-      } catch {
+      } catch (error) {
         connectTokenRef.current = null;
         setSessionVerified(false);
         setAppState("error");
         setErrorMessage(
           "Unable to start WhatsApp connection. Please try again."
         );
+
+        if (error instanceof ConnectSessionVerifyError) {
+          setVerifyDiagnostics(error.diagnostics);
+          console.error({
+            stage: "connect-session-verify",
+            apiBaseUrl: error.diagnostics.apiBaseUrl,
+            status: error.diagnostics.status,
+          });
+        } else {
+          setVerifyDiagnostics(null);
+        }
       }
     },
     []
@@ -318,6 +338,7 @@ function App() {
     signupInfoRef.current = null;
     completingRef.current = false;
     setErrorMessage("");
+    setVerifyDiagnostics(null);
 
     if (connectTokenRef.current && sessionVerified) {
       setAppState("ready");
@@ -416,6 +437,36 @@ function App() {
           >
             Try again
           </button>
+        ) : null}
+
+        {appState === "error" && verifyDiagnostics ? (
+          <div
+            style={{
+              marginTop: "20px",
+              padding: "12px",
+              borderRadius: "8px",
+              background: "#f1f1f1",
+              textAlign: "left",
+              fontSize: "12px",
+              lineHeight: "1.5",
+              color: "#444",
+            }}
+          >
+            <p style={{ margin: "0 0 8px", fontWeight: 700 }}>Diagnostics (temporary)</p>
+            <p style={{ margin: 0 }}>API_BASE_URL: {verifyDiagnostics.apiBaseUrl}</p>
+            <p style={{ margin: 0 }}>
+              HTTP response received: {verifyDiagnostics.hasResponse ? "yes" : "no"}
+            </p>
+            {verifyDiagnostics.hasResponse && verifyDiagnostics.status !== null ? (
+              <p style={{ margin: 0 }}>HTTP status: {verifyDiagnostics.status}</p>
+            ) : null}
+            <p style={{ margin: 0 }}>
+              Detail:{" "}
+              {verifyDiagnostics.hasResponse
+                ? verifyDiagnostics.safeMessage
+                : "Network/CORS/fetch failure"}
+            </p>
+          </div>
         ) : null}
 
       </div>
